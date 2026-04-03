@@ -146,6 +146,26 @@ app.post("/webhook", async (req, res) => {
   res.json({ received: true });
 });
 
+app.get("/session/:id", async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.retrieve(req.params.id);
+    const meta = session.metadata;
+    const shipping = session.collected_information?.shipping_details || session.shipping_details || {};
+    res.json({
+      product: meta.product,
+      org: meta.org,
+      letters: meta.letters,
+      size: meta.size,
+      qty: meta.qty,
+      name: shipping.name || session.customer_details?.name || "",
+      email: session.customer_details?.email || "",
+      total: (session.amount_total / 100).toFixed(2)
+    });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/", (req, res) => res.send("UniFit backend running!"));
 
 const PORT = process.env.PORT || 3000;
