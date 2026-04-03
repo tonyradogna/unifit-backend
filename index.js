@@ -8,7 +8,13 @@ app.use(cors({
   origin: ['https://inquisitive-wisp-612937.netlify.app', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
 }));
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.path === '/webhook') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 const PRINTFUL_TOKEN = process.env.PRINTFUL_TOKEN;
 
