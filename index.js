@@ -4,7 +4,10 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ['https://inquisitive-wisp-612937.netlify.app', 'http://localhost:3000'],
+  methods: ['GET', 'POST'],
+}));
 app.use(express.json());
 
 const PRINTFUL_TOKEN = process.env.PRINTFUL_TOKEN;
