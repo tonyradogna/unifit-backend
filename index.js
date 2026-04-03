@@ -127,7 +127,7 @@ app.post("/webhook", async (req, res) => {
               name: `${product} — ${letters}`,
               files: [
                 {
-                  type: "front",
+                  type: "default",
                   url: `https://via.placeholder.com/600x600/${garmentColor.replace("#", "")}/${letterColor.replace("#", "")}?text=${encodeURIComponent(letters)}`,
                 },
               ],
