@@ -4,10 +4,12 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app = express();
+
 app.use(cors({
   origin: ['https://inquisitive-wisp-612937.netlify.app', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
 }));
+
 app.use((req, res, next) => {
   if (req.path === '/webhook') {
     express.raw({ type: 'application/json' })(req, res, next);
@@ -18,7 +20,6 @@ app.use((req, res, next) => {
 
 const PRINTFUL_TOKEN = process.env.PRINTFUL_TOKEN;
 
-// ── PRODUCT PRICES ──
 const PRICES = {
   "Crop Top": 3800,
   "Unisex Tee": 3200,
@@ -28,17 +29,14 @@ const PRICES = {
   "Tank Top": 2800,
   "Phone Case": 2800,
   "Tote Bag": 3000,
-  "Hat / Cap": 4200,
-  "Tumbler": 3800,
 };
 
 const SHIPPING = {
   "Crop Top": 399, "Unisex Tee": 399, "Women's Tee": 399,
   "Hoodie": 599, "Crewneck": 599, "Tank Top": 399,
-  "Phone Case": 399, "Tote Bag": 399, "Hat / Cap": 499, "Tumbler": 599,
+  "Phone Case": 399, "Tote Bag": 399,
 };
 
-// ── CREATE STRIPE CHECKOUT ──
 app.post("/create-checkout", async (req, res) => {
   try {
     const { product, letters, org, letterColor, garmentColor, font, size, qty, successUrl, cancelUrl } = req.body;
@@ -79,28 +77,33 @@ app.post("/create-checkout", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error(err);
+    console.error("Checkout error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── STRIPE WEBHOOK → PRINTFUL ──
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+app.post("/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
+
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
+    console.error("Webhook signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const { product, letters, letterColor, garmentColor, qty } = session.metadata;
-    const shipping = session.shipping_details;
+
+    const shippingInfo = session.collected_information?.shipping_details || session.shipping_details || {};
+    const address = shippingInfo.address || {};
+    const customerName = shippingInfo.name || session.customer_details?.name || "Customer";
+    const customerEmail = session.customer_details?.email || "";
 
     try {
-      await fetch("https://api.printful.com/orders", {
+      const response = await fetch("https://api.printful.com/orders", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${PRINTFUL_TOKEN}`,
@@ -108,14 +111,14 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
         },
         body: JSON.stringify({
           recipient: {
-            name: shipping.name,
-            address1: shipping.address.line1,
-            address2: shipping.address.line2 || "",
-            city: shipping.address.city,
-            state_code: shipping.address.state,
-            zip: shipping.address.postal_code,
-            country_code: shipping.address.country,
-            email: session.customer_details.email,
+            name: customerName,
+            address1: address.line1 || "",
+            address2: address.line2 || "",
+            city: address.city || "",
+            state_code: address.state || "",
+            zip: address.postal_code || "",
+            country_code: address.country || "US",
+            email: customerEmail,
           },
           items: [
             {
@@ -132,7 +135,9 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
           ],
         }),
       });
-      console.log("Printful order created for", letters);
+
+      const data = await response.json();
+      console.log("Printful order result:", JSON.stringify(data));
     } catch (err) {
       console.error("Printful error:", err);
     }
@@ -141,7 +146,6 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   res.json({ received: true });
 });
 
-// ── HEALTH CHECK ──
 app.get("/", (req, res) => res.send("UniFit backend running!"));
 
 const PORT = process.env.PORT || 3000;
