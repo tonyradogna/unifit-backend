@@ -285,7 +285,7 @@ app.post("/create-checkout", async (req, res) => {
       unitPrice = Math.round(unitPrice * (1 - discountPercent / 100));
     }
  
-    const FREE_SHIPPING_RATE_ID = 'shr_1TIQ1ZIwB9tX8XNuHYnBpzli';
+    const FREE_SHIPPING_RATE_ID = 'shr_1TISpSIwB9tX8XNuZyxzEpbb';
     const qualifiesForFreeShipping = orderSubtotal >= 10000;
  
     const lineItems = [{
