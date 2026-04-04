@@ -42,7 +42,7 @@ const SHIPPING = {
 // Valid coupon codes — add new ones here as needed
 // Format: CODE: { percent: number, label: string }
 const COUPONS = {
-  "FIRST25":   { percent: 25, label: "First order 25% off" },
+  "FIRST20":   { percent: 20, label: "Launch special 20% off" },
   "CHAPTER10": { percent: 10, label: "Chapter 10% discount" },
   "WELCOME15": { percent: 15, label: "Welcome 15% off" },
 };
@@ -56,6 +56,9 @@ app.post("/create-checkout", async (req, res) => {
  
     let unitPrice = PRICES[product] || 2700;
     const shipping = SHIPPING[product] || 399;
+ 
+    // Calculate order subtotal to determine free shipping eligibility
+    const orderSubtotal = unitPrice * qty;
  
     // Apply bulk discount (10% for 10+ items)
     let discountPercent = 0;
@@ -73,29 +76,39 @@ app.post("/create-checkout", async (req, res) => {
       unitPrice = Math.round(unitPrice * (1 - discountPercent / 100));
     }
  
-    const session = await stripe.checkout.sessions.create({
+    // Free shipping on orders over $10000 cents ($100)
+    const FREE_SHIPPING_RATE_ID = 'shr_1TIQ1ZIwB9tX8XNuHYnBpzli';
+    const qualifiesForFreeShipping = orderSubtotal >= 10000;
+ 
+    // Build line items — only add shipping line if not free
+    const lineItems = [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `${product} — ${letters} (${org})`,
+            description: `Size: ${size} | Font: ${font} | Colors: ${letterColor} on ${garmentColor}`,
+          },
+          unit_amount: unitPrice,
+        },
+        quantity: qty,
+      },
+    ];
+ 
+    if (!qualifiesForFreeShipping) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          product_data: { name: "Shipping" },
+          unit_amount: shipping,
+        },
+        quantity: 1,
+      });
+    }
+ 
+    const sessionConfig = {
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `${product} — ${letters} (${org})`,
-              description: `Size: ${size} | Font: ${font} | Colors: ${letterColor} on ${garmentColor}`,
-            },
-            unit_amount: unitPrice,
-          },
-          quantity: qty,
-        },
-        {
-          price_data: {
-            currency: "usd",
-            product_data: { name: "Shipping" },
-            unit_amount: shipping,
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       mode: "payment",
       allow_promotion_codes: true,
       success_url: successUrl + "?session_id={CHECKOUT_SESSION_ID}",
@@ -105,7 +118,15 @@ app.post("/create-checkout", async (req, res) => {
         product, letters, org, letterColor, garmentColor,
         font, size, qty: String(qty), couponCode: couponCode || ""
       },
-    });
+    };
+ 
+    if (qualifiesForFreeShipping) {
+      sessionConfig.shipping_options = [
+        { shipping_rate: FREE_SHIPPING_RATE_ID }
+      ];
+    }
+ 
+    const session = await stripe.checkout.sessions.create(sessionConfig);
  
     res.json({ url: session.url });
   } catch (err) {
