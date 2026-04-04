@@ -9,10 +9,13 @@ const RAILWAY_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   : "https://unifit-backend-production.up.railway.app";
  
-app.use(cors({
-  origin: ['https://inquisitive-wisp-612937.netlify.app', 'https://shopcampusfit.com', 'https://www.shopcampusfit.com', 'http://localhost:3000'],
-  methods: ['GET', 'POST'],
-}));
+app.use((req, res, next) => {
+  if (req.path === '/webhook') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    express.json()(req, res, next);
+  }
+});
  
 app.use((req, res, next) => {
   if (req.path === '/webhook') {
