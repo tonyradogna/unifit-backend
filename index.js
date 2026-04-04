@@ -6,7 +6,7 @@ const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...ar
 const app = express();
 
 app.use(cors({
-  origin: ['https://inquisitive-wisp-612937.netlify.app', 'http://localhost:3000'],
+  rigin: ['https://inquisitive-wisp-612937.netlify.app', 'https://shopcampusfit.com', 'https://www.shopcampusfit.com', 'http://localhost:3000'],
   methods: ['GET', 'POST'],
 }));
 
